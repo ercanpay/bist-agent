@@ -62,6 +62,8 @@ def pull_market():
          .select(*COLUMNS)
          .limit(800))
     q.query['ignore_unknown_fields'] = True
+    q.query.pop('preset', None)
+    q.query['options'] = {'lang': 'tr'}
     total, df = q.get_scanner_data()
     print(f"Piyasa çekildi: {len(df)} satır (toplam {total})")
     return df
