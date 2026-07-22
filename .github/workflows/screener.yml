@@ -1,0 +1,37 @@
+name: BIST Gunluk Tarama
+
+on:
+  schedule:
+    - cron: '22 15 * * 1-5'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Bagimliliklar
+        run: pip install tradingview-screener pandas
+
+      - name: Veriyi cek
+        run: python bist_screener.py
+
+      - name: Eski dosyalari temizle
+        run: |
+          find data -name "bist_*.csv" -mtime +30 -delete || true
+
+      - name: Commit ve push
+        run: |
+          git config user.name "bist-agent"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "Tarama verisi $(date +%F)"
+          git push
