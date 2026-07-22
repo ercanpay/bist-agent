@@ -5,7 +5,7 @@ TradingView scanner API'sinden (tradingview-screener paketi) tüm BIST
 hisselerini ve XU100 üyelik bilgisini çeker, CSV olarak kaydeder.
 Günlük GitHub Actions ile çalışır. Giriş/şifre GEREKTİRMEZ.
 """
-import sys, datetime, traceback
+import sys, os, datetime, traceback
 import pandas as pd
 from tradingview_screener import Query
 
@@ -85,6 +85,7 @@ def pull_xu100_symbols():
 
 def main():
     today = datetime.date.today().isoformat()
+    os.makedirs('data', exist_ok=True)
     df = pull_market()
     if len(df) < 300:
         print(f"HATA: {len(df)} satır — beklenenden az, veri şüpheli. Çıkılıyor.")
