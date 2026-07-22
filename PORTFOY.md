@@ -2,25 +2,32 @@
 Son güncelleme: 22 Temmuz 2026
 
 ## MANDAT
-- Portföy 1 (Ana Fon): 1.000.000 TL — endeks kısıtsız, %50 PPF / %50 BIST hedefli
-- Portföy 2 (Saldırı Fonu): 1.000.000 TL — sadece XU100 DIŞI hisseler, tam risk
-- Fonlama kaynağı: TERA pozisyonu satışı
+- Tek portföy: 1.000.000 TL
+- Strateji: Momentum + price action. Kırılım avı, hacim teyidi, dar stop,
+  hızlı kesme, kazananı bırakma
+- Endeks kısıtı yok
+- Fonlama kaynağı: TERA satışı
 
-## DURUM: HENÜZ FONLANMADI
-Her iki portföy de %100 nakit. Açık pozisyon yok. NAV sayımı başlamadı.
+## DURUM: FONLANMADI
+Portföy %100 nakit. Açık pozisyon yok. NAV sayımı başlamadı.
 
 ## AÇIK POZİSYON (portföy dışı, fonlama kaynağı)
 | Hisse | Lot | Maliyet | Son fiyat | Durum |
 |---|---|---|---|---|
-| TERA | 52.645 | 160,00 | 163,30 (22 Tem) | ÇIKIŞ BEKLİYOR — zaman stopu 17 Tem'de doldu, aşıldı |
-
-TERA notu: Tez bozuk (float mühendisliği, dilutif bedelli riski, MSCI/SPK
-yapısal sorunu). Çıkış talimatı: tam çıkış, tek piyasa emri. Acil taban 147.
+| TERA | 52.645 | 160,00 | 163,30 (22 Tem) | ÇIKIŞ BEKLİYOR — zaman stopu 17 Tem'de doldu |
 
 ## İŞLEM GEÇMİŞİ
-(Henüz işlem yok. Her gerçekleşen emir buraya tarih, lot, fiyat ile yazılacak.)
+| Tarih | Hisse | Yön | Lot | Fiyat | Stop | R | Sonuç |
+|---|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | — | Henüz işlem yok |
 
 ## NAV GEÇMİŞİ
-| Tarih | P1 NAV | P2 NAV | Not |
+| Tarih | NAV | Aylık % | Not |
 |---|---|---|---|
-| — | — | — | Fonlama bekleniyor |
+| — | 1.000.000 | — | Fonlama bekleniyor |
+
+## PERFORMANS İSTATİSTİKLERİ
+- Toplam işlem: 0
+- Kazanan/kaybeden: 0/0
+- Ortalama R: —
+- En büyük kazanç / kayıp: —
