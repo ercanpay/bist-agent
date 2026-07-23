@@ -31,6 +31,11 @@ CMBTN, KONYA, OTKAR, GARAN, MRSHL, PRKME, KUYAS, PSDTC, KOCMT
 - Destek: 13.900 / 13.800 / 13.500
 - Direnç: 14.100 / 14.200 / 14.600
 - Kural: 13.900 altında yeni pozisyon yok
+- 
+- ## VERİ NOTU
+Tüm fiyat, hacim ve gösterge değerleri bir önceki işlem gününün
+KAPANIŞ verisidir. Gün içi hareket bu raporda görünmez;
+gün içi takip TradingView alarmlarıyla yapılır.
 
 ## KATALİZÖRLER
 - 23 Temmuz 14:00: TCMB PPK (beklenti %37 sabit)
