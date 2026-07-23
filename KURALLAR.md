@@ -74,6 +74,37 @@ Kırılımdan %8'den fazla uzaklaşmış fiyata girilmez — kovalama yasağı
 - ZAMAN STOPU: 10 işlem gününde 1R'ye ulaşmayan pozisyon kapatılır
 - Tez bozulduğunda maliyet fiyatı karar kriteri DEĞİLDİR
 
+## AKILLI PARA TAKİBİ (ana av sahası)
+Momentum kırılımları giriş zamanlamasını verir; akıllı para taraması
+NEREYE bakacağımızı söyler. Öncelik sırası: önce akıllı para listesinde
+olan hisseler, sonra saf momentum adayları.
+
+### Ölçüm bileşenleri (CSV'de hazır kolonlar)
+- Hacim rejimi, günlük = bugünkü hacim / 10 günlük ortalama
+- Hacim rejimi, haftalık = 10 günlük ort. / 30 günlük ort.
+- Hacim rejimi, aylık = 30 günlük ort. / 90 günlük ort.
+- Fiyat-hacim uyumu (-3 ile +3): her pencerede hacim genişlerken fiyat
+  yukarıysa +1, aşağıysa −1. +2 ve üstü = birikim, −2 ve altı = dağıtım
+- Akıllı Para Skoru (0-100): hacim rejimi + fiyat-hacim uyumu + MFI-RSI
+
+### Sınıflandırma
+| Sınıf | Şart | Anlamı | Aksiyon |
+|---|---|---|---|
+| BİRİKİM | Aylık rejim > 1,2 · Haftalık rejim > 1,1 · Uyum ≥ +2 · Skor > 60 | Sessiz kurumsal alım, fiyat henüz patlamamış | Ana av sahası — izleme listesine al, kırılım bekle |
+| TETİKLENME | Birikim şartları + günlük rejim > 2,0 + kırılım | Birikim tamamlandı, hareket başladı | Momentum kurallarıyla giriş |
+| DAĞITIM | Uyum ≤ −2 · Aylık rejim > 1,2 | Hacim var ama fiyat düşüyor — tepede satış | YASAK. İzleme listesinden çıkar |
+| SESSİZ | Tüm rejimler ~1,0 | Kimse ilgilenmiyor | Görmezden gel |
+
+### Kurallar
+- BİRİKİM sınıfındaki hisseler momentum kırılımı verdiğinde kademe
+  bir üst basamağa çıkar (C→B, B→A). Akıllı para teyidi, boyut artışını
+  hak eder
+- DAĞITIM sınıfındaki hisse hiçbir kademede alınmaz — momentum kırılımı
+  verse bile. (MRSHL dersi: MFI 100, RSI 81, fiyat koşuyordu; uyum −2 idi)
+- Birikim listesinde 20 günden uzun süre bekleyen ve kırılım vermeyen
+  hisse listeden düşer — birikim sonsuza kadar sürmez, süren birikim
+  yanlış okumadır
+
 ## GÜNLÜK TARAMA KRİTERLERİ
 KIRILIM (A): relvol > 1,5 · günlük değişim > +%3 VEYA 3A zirveye mesafe < %2
 · fiyat > SMA20 ve SMA50 · ADX > 20 · ciro > 50M TL · RSI 50-78
