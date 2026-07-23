@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-BIST Otomatik Tarama Verisi Çekici
-TradingView scanner API'sinden (tradingview-screener paketi) tüm BIST
-hisselerini ve XU100 üyelik bilgisini çeker, CSV olarak kaydeder.
-Günlük GitHub Actions ile çalışır. Giriş/şifre GEREKTİRMEZ.
+BIST Otomatik Tarama Verisi Cekici
+- Tum BIST hisseleri + XU100 uyeligi
+- Makro veriler (BIST100 endeks, USDTRY, Brent, ons altin)
+- Akilli Para Skoru bilesenleri (hacim rejimi + fiyat-hacim uyumu)
 """
 import sys, os, datetime, traceback
 import pandas as pd
 from tradingview_screener import Query
 
-# Claude'un tarama sisteminin kullandığı tüm kolonlar (TradingView ham adları)
 COLUMNS = [
     'name', 'description', 'close', 'change',
     'market_cap_basic', 'float_shares_percent_current',
     'volume', 'average_volume_10d_calc', 'average_volume_30d_calc',
-    'average_volume_60d_calc', 'relative_volume_10d_calc',
+    'average_volume_60d_calc', 'average_volume_90d_calc',
+    'relative_volume_10d_calc',
     'Perf.W', 'Perf.1M', 'Perf.3M', 'Perf.6M', 'Perf.YTD',
     'RSI', 'MoneyFlow', 'ADX',
     'MACD.macd', 'MACD.signal',
@@ -24,9 +24,9 @@ COLUMNS = [
     'ATRP', 'Volatility.W', 'Volatility.M',
     'BB.upper', 'BB.lower',
     'sector.tr', 'price_earnings_ttm', 'price_book_fq',
+    'change_from_open', 'gap',
 ]
 
-# Rapor tarafındaki Türkçe kolon adları (Claude'un beklediği şema)
 RENAME = {
     'name': 'Sembol', 'description': 'Açıklama', 'close': 'Fiyat',
     'change': 'Fiyat değişimi %, 1 gün',
@@ -36,6 +36,7 @@ RENAME = {
     'average_volume_10d_calc': 'Ortalama hacim, 10 gün',
     'average_volume_30d_calc': 'Ortalama hacim, 30 gün',
     'average_volume_60d_calc': 'Ortalama hacim, 60 gün',
+    'average_volume_90d_calc': 'Ortalama hacim, 90 gün',
     'relative_volume_10d_calc': 'Bağıl hacim, 1 gün',
     'Perf.W': 'Performans %, 1 hafta', 'Perf.1M': 'Performans %, 1 ay',
     'Perf.3M': 'Performans %, 3 ay', 'Perf.6M': 'Performans %, 6 ay',
@@ -52,58 +53,140 @@ RENAME = {
     'BB.upper': 'BB Upper', 'BB.lower': 'BB Lower',
     'sector.tr': 'Sektör',
     'price_earnings_ttm': 'F/K', 'price_book_fq': 'PD/DD',
+    'change_from_open': 'Açılıştan değişim %', 'gap': 'Gap %',
+}
+
+MACRO = {
+    'BIST:XU100': 'BIST 100',
+    'FX_IDC:USDTRY': 'USD/TRY',
+    'TVC:UKOIL': 'Brent',
+    'TVC:GOLD': 'Ons Altın',
+    'FX_IDC:EURTRY': 'EUR/TRY',
 }
 
 
 def pull_market():
-    """Tüm BIST hisselerini çek."""
-    q = (Query()
-         .set_markets('turkey')
-         .select(*COLUMNS)
-         .limit(800))
+    q = (Query().set_markets('turkey').select(*COLUMNS).limit(800))
     q.query['ignore_unknown_fields'] = True
-    q.query.pop('preset', None)
-    q.query['options'] = {'lang': 'tr'}
     total, df = q.get_scanner_data()
-    print(f"Piyasa çekildi: {len(df)} satır (toplam {total})")
+    print(f"Piyasa cekildi: {len(df)} satir (toplam {total})")
     return df
 
 
 def pull_xu100_symbols():
-    """XU100 (BIST 100) üyelerinin sembol listesini çek."""
     q = Query().set_markets('turkey').select('name').limit(150)
     q.query['symbols'] = {'symbolset': ['SYML:BIST;XU100']}
     q.query['ignore_unknown_fields'] = True
     try:
         _, df = q.get_scanner_data()
         syms = set(df['name'].astype(str))
-        print(f"XU100 üyeleri çekildi: {len(syms)} sembol")
+        print(f"XU100 uyeleri: {len(syms)} sembol")
         return syms
     except Exception:
-        print("UYARI: XU100 listesi çekilemedi, kolon boş bırakılıyor")
+        print("UYARI: XU100 listesi cekilemedi")
         traceback.print_exc()
         return set()
+
+
+def pull_macro():
+    """Endeks, kur, emtia verilerini cek."""
+    rows = []
+    q = (Query().select('name', 'close', 'change', 'Perf.W', 'Perf.1M')
+         .limit(20))
+    q.query['symbols'] = {'tickers': list(MACRO.keys())}
+    q.query['ignore_unknown_fields'] = True
+    try:
+        _, df = q.get_scanner_data()
+        for _, r in df.iterrows():
+            tk = r.get('ticker', '')
+            rows.append({
+                'Gosterge': MACRO.get(tk, tk),
+                'Ticker': tk,
+                'Deger': r.get('close'),
+                'Degisim %': r.get('change'),
+                'Hafta %': r.get('Perf.W'),
+                'Ay %': r.get('Perf.1M'),
+            })
+        print(f"Makro veriler cekildi: {len(rows)} gosterge")
+    except Exception:
+        print("UYARI: Makro veriler cekilemedi")
+        traceback.print_exc()
+    return pd.DataFrame(rows)
+
+
+def add_smart_money(df):
+    """Akilli Para Skoru bilesenleri.
+
+    (a) Fiyat-hacim uyumu: hacim genislerken fiyat yonu
+    (b) Hacim rejimi degisimi: gunluk / haftalik / aylik pencereler
+    """
+    v1 = pd.to_numeric(df['Hacim, 1 gün'], errors='coerce')
+    v10 = pd.to_numeric(df['Ortalama hacim, 10 gün'], errors='coerce')
+    v30 = pd.to_numeric(df['Ortalama hacim, 30 gün'], errors='coerce')
+    v60 = pd.to_numeric(df['Ortalama hacim, 60 gün'], errors='coerce')
+    v90 = pd.to_numeric(df['Ortalama hacim, 90 gün'], errors='coerce')
+    px = pd.to_numeric(df['Fiyat'], errors='coerce')
+    ch1 = pd.to_numeric(df['Fiyat değişimi %, 1 gün'], errors='coerce')
+    chw = pd.to_numeric(df['Performans %, 1 hafta'], errors='coerce')
+    chm = pd.to_numeric(df['Performans %, 1 ay'], errors='coerce')
+
+    # (b) Hacim rejimi — uc pencere
+    df['Hacim rejimi, gunluk'] = (v1 / v10).round(2)      # bugun vs son 2 hafta
+    df['Hacim rejimi, haftalik'] = (v10 / v30).round(2)   # son 2 hafta vs 6 hafta
+    df['Hacim rejimi, aylik'] = (v30 / v90).round(2)      # son 6 hafta vs 4.5 ay
+    df['Ciro, 10g (M TL)'] = (v10 * px / 1e6).round(1)
+
+    # (a) Fiyat-hacim uyumu: her pencerede hacim genisledi mi VE fiyat yukari mi
+    def concord(vol_ratio, perf, vol_esik):
+        s = pd.Series(0.0, index=df.index)
+        genis = vol_ratio > vol_esik
+        s[genis & (perf > 0)] = 1.0        # hacim genis + fiyat yukari = birikim
+        s[genis & (perf < 0)] = -1.0       # hacim genis + fiyat asagi = dagitim
+        return s
+
+    c_d = concord(df['Hacim rejimi, gunluk'], ch1, 1.3)
+    c_w = concord(df['Hacim rejimi, haftalik'], chw, 1.15)
+    c_m = concord(df['Hacim rejimi, aylik'], chm, 1.10)
+    df['Fiyat-hacim uyumu'] = (c_d + c_w + c_m).round(1)  # -3 ile +3 arasi
+
+    # Akilli Para Skoru (0-100)
+    rej = ((df['Hacim rejimi, gunluk'].clip(0, 3) / 3) * 15 +
+           ((df['Hacim rejimi, haftalik'] - 0.8).clip(0, 1.2) / 1.2) * 20 +
+           ((df['Hacim rejimi, aylik'] - 0.8).clip(0, 1.2) / 1.2) * 20)
+    uyum = ((df['Fiyat-hacim uyumu'] + 3) / 6) * 30
+    mfi = pd.to_numeric(df['MFI'], errors='coerce')
+    rsi = pd.to_numeric(df['RSI'], errors='coerce')
+    irak = ((mfi - rsi).clip(-10, 40) / 40) * 15
+    df['Akilli Para Skoru'] = (rej + uyum + irak).round(1)
+    return df
 
 
 def main():
     today = datetime.date.today().isoformat()
     os.makedirs('data', exist_ok=True)
+
     df = pull_market()
     if len(df) < 300:
-        print(f"HATA: {len(df)} satır — beklenenden az, veri şüpheli. Çıkılıyor.")
+        print(f"HATA: {len(df)} satir, cok az. Cikiliyor.")
         sys.exit(1)
 
     xu100 = pull_xu100_symbols()
     df = df.rename(columns=RENAME)
-    # ticker kolonu 'BIST:XXXX' formatında gelir; sembolü temizle
     if 'ticker' in df.columns:
         df = df.drop(columns=['ticker'])
     df['XU100'] = df['Sembol'].astype(str).isin(xu100)
+    df = add_smart_money(df)
     df.insert(0, 'Tarih', today)
 
     df.to_csv('data/latest.csv', index=False, encoding='utf-8-sig')
     df.to_csv(f'data/bist_{today}.csv', index=False, encoding='utf-8-sig')
-    print(f"Kaydedildi: data/latest.csv ve data/bist_{today}.csv ({len(df)} satır)")
+    print(f"Kaydedildi: data/latest.csv ({len(df)} satir, {len(df.columns)} kolon)")
+
+    macro = pull_macro()
+    if len(macro):
+        macro.insert(0, 'Tarih', today)
+        macro.to_csv('data/macro.csv', index=False, encoding='utf-8-sig')
+        print("Kaydedildi: data/macro.csv")
 
 
 if __name__ == '__main__':
