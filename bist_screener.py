@@ -59,9 +59,10 @@ RENAME = {
 MACRO = {
     'BIST:XU100': 'BIST 100',
     'FX_IDC:USDTRY': 'USD/TRY',
+    'FX_IDC:EURTRY': 'EUR/TRY',
     'TVC:UKOIL': 'Brent',
     'TVC:GOLD': 'Ons Altın',
-    'FX_IDC:EURTRY': 'EUR/TRY',
+    'TVC:TR10Y': 'TR 10Y Tahvil',
 }
 
 
@@ -89,28 +90,33 @@ def pull_xu100_symbols():
 
 
 def pull_macro():
-    """Endeks, kur, emtia verilerini cek."""
+    """Endeks, kur, emtia verilerini cek (her biri ayri sorgu)."""
+    import requests
     rows = []
-    q = (Query().select('name', 'close', 'change', 'Perf.W', 'Perf.1M')
-         .limit(20))
-    q.query['symbols'] = {'tickers': list(MACRO.keys())}
-    q.query['ignore_unknown_fields'] = True
-    try:
-        _, df = q.get_scanner_data()
-        for _, r in df.iterrows():
-            tk = r.get('ticker', '')
-            rows.append({
-                'Gosterge': MACRO.get(tk, tk),
-                'Ticker': tk,
-                'Deger': r.get('close'),
-                'Degisim %': r.get('change'),
-                'Hafta %': r.get('Perf.W'),
-                'Ay %': r.get('Perf.1M'),
-            })
-        print(f"Makro veriler cekildi: {len(rows)} gosterge")
-    except Exception:
-        print("UYARI: Makro veriler cekilemedi")
-        traceback.print_exc()
+    url = 'https://scanner.tradingview.com/global/scan'
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    for tk, isim in MACRO.items():
+        try:
+            payload = {
+                'symbols': {'tickers': [tk], 'query': {'types': []}},
+                'columns': ['close', 'change', 'Perf.W', 'Perf.1M'],
+            }
+            r = requests.post(url, json=payload, headers=headers, timeout=20)
+            r.raise_for_status()
+            d = r.json().get('data', [])
+            if d and d[0].get('d'):
+                v = d[0]['d']
+                rows.append({
+                    'Gosterge': isim, 'Ticker': tk,
+                    'Deger': v[0], 'Degisim %': v[1],
+                    'Hafta %': v[2], 'Ay %': v[3],
+                })
+                print(f"  {isim}: {v[0]}")
+            else:
+                print(f"  UYARI: {isim} ({tk}) bos dondu")
+        except Exception as e:
+            print(f"  UYARI: {isim} ({tk}) cekilemedi: {e}")
+    print(f"Makro veriler cekildi: {len(rows)} gosterge")
     return pd.DataFrame(rows)
 
 
