@@ -1,5 +1,16 @@
-# İZLEME LİSTESİ — MOMENTUM KURULUMLARI
-Son güncelleme: 22 Temmuz 2026
+# İZLEME LİSTESİ
+Son güncelleme: 23 Temmuz 2026
+
+## VERİ NOTU
+Tüm fiyat, hacim ve gösterge değerleri bir önceki işlem gününün KAPANIŞ
+verisidir. Gün içi hareket bu raporda görünmez; gün içi takip TradingView
+alarmlarıyla yapılır.
+
+## AA) BİRİKİM LİSTESİ (ana av sahası)
+Akıllı para giriyor, fiyat henüz patlamadı. Kırılım bekleniyor.
+| Hisse | Fiyat | Skor | Aylık rejim | Haftalık rejim | Uyum | Kaç gündür listede | İzlenen seviye |
+|---|---|---|---|---|---|---|---|
+| (rutin dolduracak) | | | | | | | |
 
 ## A) KIRILIM GERÇEKLEŞMİŞ — GERİ TEST BEKLİYOR
 | Hisse | Fiyat | Kırılan seviye | Giriş bölgesi | Stop | Kademe | Not |
@@ -21,21 +32,14 @@ Son güncelleme: 22 Temmuz 2026
 
 ## C) İZLEME — HENÜZ KURULUM YOK
 ALCAR (887), JANTS (15,62), KLSYN (14,66), DUNYH (147,40), LIDER (116,70)
-Yeni metodolojiye göre kurulum vermedikçe alınmaz; rutin her gün yeniden
-değerlendirir.
 
-## D) ELENDİ
-CMBTN, KONYA, OTKAR, GARAN, MRSHL, PRKME, KUYAS, PSDTC, KOCMT
+## D) ELENDİ / DAĞITIM
+CMBTN, KONYA, OTKAR, GARAN, MRSHL (dağıtım), PRKME (temel), KUYAS, PSDTC, KOCMT
 
 ## ENDEKS
 - Destek: 13.900 / 13.800 / 13.500
 - Direnç: 14.100 / 14.200 / 14.600
 - Kural: 13.900 altında yeni pozisyon yok
-- 
-- ## VERİ NOTU
-Tüm fiyat, hacim ve gösterge değerleri bir önceki işlem gününün
-KAPANIŞ verisidir. Gün içi hareket bu raporda görünmez;
-gün içi takip TradingView alarmlarıyla yapılır.
 
 ## KATALİZÖRLER
 - 23 Temmuz 14:00: TCMB PPK (beklenti %37 sabit)
