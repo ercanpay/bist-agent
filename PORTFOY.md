@@ -1,5 +1,9 @@
 # ERCAN FONU — PORTFÖY DEFTERİ
-Son güncelleme: 22 Temmuz 2026
+Son güncelleme: 23 Temmuz 2026
+
+## RAPOR RİTMİ
+Günlük rapor: hafta içi 09:00, bir önceki işlem gününün kapanış verisiyle.
+Veri hattı: GitHub Actions 08:30'da CSV'yi tazeler.
 
 ## GÜNCEL NAV
 NAV: 1.000.000 TL
