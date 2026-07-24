@@ -132,7 +132,11 @@ def compute_signals(df):
     v_long = v90.fillna(v60)          # 90g yoksa 60g
     px = num(df['Fiyat'])
 
-    df['Rejim G'] = (v1 / v10).round(2)
+    # Sabah calistirmada 'Hacim 1g' henuz olusmamis olabilir; o durumda
+    # TradingView'in kendi bagil hacim kolonunu kullan (onceki kapanis bazli)
+    rejim_g = (v1 / v10)
+    bagil = num(df['Bagil hacim'])
+    df['Rejim G'] = np.where(rejim_g < 0.4, bagil, rejim_g).round(2)
     df['Rejim H'] = (v10 / v30).round(2)
     df['Rejim A'] = (v30 / v_long).round(2)
     df['Ciro M TL'] = (v10 * px / 1e6).round(1)
