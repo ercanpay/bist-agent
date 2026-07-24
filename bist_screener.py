@@ -157,6 +157,22 @@ def compute_signals(df):
     med = df.groupby('Sektor')['Rejim A'].transform('median')
     df['Sektor gorelilik'] = (df['Rejim A'] / med).round(2)
 
+    # 3 aylik bant konumu: 0 = dipte, 100 = zirvede
+    h3, l3 = num(df['Yuksek 3A']), num(df['Dusuk 3A'])
+    df['Bant konum'] = ((px - l3) / (h3 - l3) * 100).round(0)
+
+    # SIKISMA: hacim genisliyor ama fiyat yatay (yay kuruluyor)
+    hacim_genis = (df['Rejim A'] > 1.15) | (df['Rejim H'] > 1.20)
+    fiyat_yatay = num(df['Aylik %']).between(-8, 12) & num(df['Haftalik %']).between(-6, 6)
+    saglikli = (df['Bant konum'] > 40) & (num(df['MFI']) > 55)
+    df['Sikisma'] = (hacim_genis & fiyat_yatay & saglikli).astype(int)
+    rej_max = df[['Rejim A', 'Rejim H']].max(axis=1)
+    hareket = num(df['Aylik %']).abs() + num(df['Haftalik %']).abs() + 2
+    df['Sikisma skoru'] = np.where(df['Sikisma'] == 1,
+                                   ((rej_max - 1) * 100 / hareket).round(1), np.nan)
+    # Bandin dibinde hacimli yataylik = dagitim sonrasi tutunma, birikim degil
+    df['Yanlis birikim'] = (hacim_genis & fiyat_yatay & (df['Bant konum'] <= 25)).astype(int)
+
     # SMA konumu
     p, s20, s50, s200 = px, num(df['SMA20']), num(df['SMA50']), num(df['SMA200'])
     df['SMA konum'] = (
@@ -249,6 +265,10 @@ def classify(df):
     def f(r):
         if r['Dagitim'] >= 2:
             return 'DAGITIM'
+        if r['Yanlis birikim'] == 1:
+            return 'YANLIS BIRIKIM'
+        if r['Sikisma'] == 1:
+            return 'SIKISMA'
         if r['Cakisma'] == 3:
             return 'TETIKLENME'
         if r['Sinyal H'] == 1 and r['Sinyal A'] == 1:
@@ -312,6 +332,7 @@ def main():
     print(f"3/3 cakisma: {(df['Cakisma']==3).sum()}")
     print(f"2/3 cakisma: {(df['Cakisma']==2).sum()}")
     print(f"Dagitim (>=2): {(df['Dagitim']>=2).sum()}")
+    print(f"Sikisma: {(df['Sikisma']==1).sum()} | Yanlis birikim: {(df['Yanlis birikim']==1).sum()}")
     print(df['Asama'].value_counts().to_string())
 
 
