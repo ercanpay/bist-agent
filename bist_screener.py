@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-BIST Otomatik Tarama Verisi Cekici
+BIST Akilli Para Takip Sistemi
 - Tum BIST hisseleri + XU100 uyeligi
-- Makro veriler (BIST100 endeks, USDTRY, Brent, ons altin)
-- Akilli Para Skoru bilesenleri (hacim rejimi + fiyat-hacim uyumu)
+- Uc zaman diliminde hacim rejimi ve momentum
+- Gunluk arsiv (data/history.csv) -> birikim yasi, ATR sikismasi,
+  yon bazli hacim analizi
+- Sektor bazli normalizasyon
+- Makro veriler (ayri sorgu)
 """
 import sys, os, datetime, traceback
 import pandas as pd
+import numpy as np
 from tradingview_screener import Query
 
 COLUMNS = [
@@ -24,36 +28,34 @@ COLUMNS = [
     'ATRP', 'Volatility.W', 'Volatility.M',
     'BB.upper', 'BB.lower',
     'sector.tr', 'price_earnings_ttm', 'price_book_fq',
-    'change_from_open', 'gap',
 ]
 
 RENAME = {
-    'name': 'Sembol', 'description': 'Açıklama', 'close': 'Fiyat',
-    'change': 'Fiyat değişimi %, 1 gün',
-    'market_cap_basic': 'Piyasa değeri',
-    'float_shares_percent_current': 'Halka açıklık %',
-    'volume': 'Hacim, 1 gün',
-    'average_volume_10d_calc': 'Ortalama hacim, 10 gün',
-    'average_volume_30d_calc': 'Ortalama hacim, 30 gün',
-    'average_volume_60d_calc': 'Ortalama hacim, 60 gün',
-    'average_volume_90d_calc': 'Ortalama hacim, 90 gün',
-    'relative_volume_10d_calc': 'Bağıl hacim, 1 gün',
-    'Perf.W': 'Performans %, 1 hafta', 'Perf.1M': 'Performans %, 1 ay',
-    'Perf.3M': 'Performans %, 3 ay', 'Perf.6M': 'Performans %, 6 ay',
-    'Perf.YTD': 'Performans %, Güncel yıl',
+    'name': 'Sembol', 'description': 'Aciklama', 'close': 'Fiyat',
+    'change': 'Gunluk %',
+    'market_cap_basic': 'Piyasa degeri',
+    'float_shares_percent_current': 'Halka aciklik %',
+    'volume': 'Hacim 1g',
+    'average_volume_10d_calc': 'Hacim ort 10g',
+    'average_volume_30d_calc': 'Hacim ort 30g',
+    'average_volume_60d_calc': 'Hacim ort 60g',
+    'average_volume_90d_calc': 'Hacim ort 90g',
+    'relative_volume_10d_calc': 'Bagil hacim',
+    'Perf.W': 'Haftalik %', 'Perf.1M': 'Aylik %',
+    'Perf.3M': '3 Aylik %', 'Perf.6M': '6 Aylik %',
+    'Perf.YTD': 'YTD %',
     'RSI': 'RSI', 'MoneyFlow': 'MFI', 'ADX': 'ADX',
-    'MACD.macd': 'MACD Level', 'MACD.signal': 'MACD Signal',
+    'MACD.macd': 'MACD', 'MACD.signal': 'MACD Signal',
     'SMA20': 'SMA20', 'SMA50': 'SMA50', 'SMA200': 'SMA200',
-    'High.1M': 'Yüksek, 1 ay', 'High.3M': 'Yüksek, 3 ay',
-    'High.6M': 'Yüksek, 6 ay', 'price_52_week_high': 'Yüksek, 52 hafta',
-    'High.All': 'Yüksek, Tüm Zamanlar',
-    'Low.1M': 'Düşük, 1 ay', 'Low.3M': 'Düşük, 3 ay',
-    'ATRP': 'ATR %', 'Volatility.W': 'Volatilite, 1 hafta',
-    'Volatility.M': 'Volatilite, 1 ay',
-    'BB.upper': 'BB Upper', 'BB.lower': 'BB Lower',
-    'sector.tr': 'Sektör',
+    'High.1M': 'Yuksek 1A', 'High.3M': 'Yuksek 3A',
+    'High.6M': 'Yuksek 6A', 'price_52_week_high': 'Yuksek 52H',
+    'High.All': 'Yuksek ATH',
+    'Low.1M': 'Dusuk 1A', 'Low.3M': 'Dusuk 3A',
+    'ATRP': 'ATR %', 'Volatility.W': 'Volatilite 1H',
+    'Volatility.M': 'Volatilite 1A',
+    'BB.upper': 'BB Ust', 'BB.lower': 'BB Alt',
+    'sector.tr': 'Sektor',
     'price_earnings_ttm': 'F/K', 'price_book_fq': 'PD/DD',
-    'change_from_open': 'Açılıştan değişim %', 'gap': 'Gap %',
 }
 
 MACRO = {
@@ -61,36 +63,36 @@ MACRO = {
     'FX_IDC:USDTRY': 'USD/TRY',
     'FX_IDC:EURTRY': 'EUR/TRY',
     'TVC:UKOIL': 'Brent',
-    'TVC:GOLD': 'Ons Altın',
-    'TVC:TR10Y': 'TR 10Y Tahvil',
+    'TVC:GOLD': 'Ons Altin',
 }
+
+HIST_PATH = 'data/history.csv'
+HIST_KEEP_DAYS = 120
 
 
 def pull_market():
     q = (Query().set_markets('turkey').select(*COLUMNS).limit(800))
     q.query['ignore_unknown_fields'] = True
     total, df = q.get_scanner_data()
-    print(f"Piyasa cekildi: {len(df)} satir (toplam {total})")
+    print(f"Piyasa cekildi: {len(df)} satir")
     return df
 
 
-def pull_xu100_symbols():
+def pull_xu100():
     q = Query().set_markets('turkey').select('name').limit(150)
     q.query['symbols'] = {'symbolset': ['SYML:BIST;XU100']}
     q.query['ignore_unknown_fields'] = True
     try:
         _, df = q.get_scanner_data()
-        syms = set(df['name'].astype(str))
-        print(f"XU100 uyeleri: {len(syms)} sembol")
-        return syms
+        s = set(df['name'].astype(str))
+        print(f"XU100: {len(s)} sembol")
+        return s
     except Exception:
-        print("UYARI: XU100 listesi cekilemedi")
-        traceback.print_exc()
+        print("UYARI: XU100 cekilemedi")
         return set()
 
 
 def pull_macro():
-    """Endeks, kur, emtia verilerini cek (her biri ayri sorgu)."""
     import requests
     rows = []
     url = 'https://scanner.tradingview.com/global/scan'
@@ -106,65 +108,173 @@ def pull_macro():
             d = r.json().get('data', [])
             if d and d[0].get('d'):
                 v = d[0]['d']
-                rows.append({
-                    'Gosterge': isim, 'Ticker': tk,
-                    'Deger': v[0], 'Degisim %': v[1],
-                    'Hafta %': v[2], 'Ay %': v[3],
-                })
+                rows.append({'Gosterge': isim, 'Deger': v[0],
+                             'Gunluk %': v[1], 'Haftalik %': v[2],
+                             'Aylik %': v[3]})
                 print(f"  {isim}: {v[0]}")
             else:
-                print(f"  UYARI: {isim} ({tk}) bos dondu")
+                print(f"  UYARI: {isim} bos")
         except Exception as e:
-            print(f"  UYARI: {isim} ({tk}) cekilemedi: {e}")
-    print(f"Makro veriler cekildi: {len(rows)} gosterge")
+            print(f"  UYARI: {isim} hata: {e}")
+    print(f"Makro: {len(rows)} gosterge")
     return pd.DataFrame(rows)
 
 
-def add_smart_money(df):
-    """Akilli Para Skoru bilesenleri.
+def num(s):
+    return pd.to_numeric(s, errors='coerce')
 
-    (a) Fiyat-hacim uyumu: hacim genislerken fiyat yonu
-    (b) Hacim rejimi degisimi: gunluk / haftalik / aylik pencereler
-    """
-    v1 = pd.to_numeric(df['Hacim, 1 gün'], errors='coerce')
-    v10 = pd.to_numeric(df['Ortalama hacim, 10 gün'], errors='coerce')
-    v30 = pd.to_numeric(df['Ortalama hacim, 30 gün'], errors='coerce')
-    v60 = pd.to_numeric(df['Ortalama hacim, 60 gün'], errors='coerce')
-    v90 = pd.to_numeric(df['Ortalama hacim, 90 gün'], errors='coerce')
-    px = pd.to_numeric(df['Fiyat'], errors='coerce')
-    ch1 = pd.to_numeric(df['Fiyat değişimi %, 1 gün'], errors='coerce')
-    chw = pd.to_numeric(df['Performans %, 1 hafta'], errors='coerce')
-    chm = pd.to_numeric(df['Performans %, 1 ay'], errors='coerce')
 
-    # (b) Hacim rejimi — uc pencere
-    df['Hacim rejimi, gunluk'] = (v1 / v10).round(2)      # bugun vs son 2 hafta
-    df['Hacim rejimi, haftalik'] = (v10 / v30).round(2)   # son 2 hafta vs 6 hafta
-    df['Hacim rejimi, aylik'] = (v30 / v90).round(2)      # son 6 hafta vs 4.5 ay
-    df['Ciro, 10g (M TL)'] = (v10 * px / 1e6).round(1)
+def compute_signals(df):
+    """Uc zaman diliminde hacim rejimi + momentum + cakisma."""
+    v1, v10 = num(df['Hacim 1g']), num(df['Hacim ort 10g'])
+    v30, v60 = num(df['Hacim ort 30g']), num(df['Hacim ort 60g'])
+    v90 = num(df['Hacim ort 90g'])
+    v_long = v90.fillna(v60)          # 90g yoksa 60g
+    px = num(df['Fiyat'])
 
-    # (a) Fiyat-hacim uyumu: her pencerede hacim genisledi mi VE fiyat yukari mi
-    def concord(vol_ratio, perf, vol_esik):
-        s = pd.Series(0.0, index=df.index)
-        genis = vol_ratio > vol_esik
-        s[genis & (perf > 0)] = 1.0        # hacim genis + fiyat yukari = birikim
-        s[genis & (perf < 0)] = -1.0       # hacim genis + fiyat asagi = dagitim
-        return s
+    df['Rejim G'] = (v1 / v10).round(2)
+    df['Rejim H'] = (v10 / v30).round(2)
+    df['Rejim A'] = (v30 / v_long).round(2)
+    df['Ciro M TL'] = (v10 * px / 1e6).round(1)
 
-    c_d = concord(df['Hacim rejimi, gunluk'], ch1, 1.3)
-    c_w = concord(df['Hacim rejimi, haftalik'], chw, 1.15)
-    c_m = concord(df['Hacim rejimi, aylik'], chm, 1.10)
-    df['Fiyat-hacim uyumu'] = (c_d + c_w + c_m).round(1)  # -3 ile +3 arasi
+    sg = (df['Rejim G'] > 1.3) & (num(df['Gunluk %']) > 0)
+    sh = (df['Rejim H'] > 1.15) & (num(df['Haftalik %']) > 0)
+    sa = (df['Rejim A'] > 1.10) & (num(df['Aylik %']) > 0)
+    df['Sinyal G'] = sg.astype(int)
+    df['Sinyal H'] = sh.astype(int)
+    df['Sinyal A'] = sa.astype(int)
+    df['Cakisma'] = df['Sinyal G'] + df['Sinyal H'] + df['Sinyal A']
+    df['Cakisma tipi'] = (
+        np.where(sg, 'G', '') + np.where(sh, 'H', '') + np.where(sa, 'A', ''))
 
-    # Akilli Para Skoru (0-100)
-    rej = ((df['Hacim rejimi, gunluk'].clip(0, 3) / 3) * 15 +
-           ((df['Hacim rejimi, haftalik'] - 0.8).clip(0, 1.2) / 1.2) * 20 +
-           ((df['Hacim rejimi, aylik'] - 0.8).clip(0, 1.2) / 1.2) * 20)
-    uyum = ((df['Fiyat-hacim uyumu'] + 3) / 6) * 30
-    mfi = pd.to_numeric(df['MFI'], errors='coerce')
-    rsi = pd.to_numeric(df['RSI'], errors='coerce')
-    irak = ((mfi - rsi).clip(-10, 40) / 40) * 15
-    df['Akilli Para Skoru'] = (rej + uyum + irak).round(1)
+    # Dagitim: hacim genis ama fiyat asagi
+    dg = (df['Rejim G'] > 1.3) & (num(df['Gunluk %']) < 0)
+    dh = (df['Rejim H'] > 1.15) & (num(df['Haftalik %']) < 0)
+    da = (df['Rejim A'] > 1.10) & (num(df['Aylik %']) < 0)
+    df['Dagitim'] = (dg.astype(int) + dh.astype(int) + da.astype(int))
+
+    # Sektor goreliligi: hissenin aylik rejimi / sektor medyani
+    med = df.groupby('Sektor')['Rejim A'].transform('median')
+    df['Sektor gorelilik'] = (df['Rejim A'] / med).round(2)
+
+    # SMA konumu
+    p, s20, s50, s200 = px, num(df['SMA20']), num(df['SMA50']), num(df['SMA200'])
+    df['SMA konum'] = (
+        np.where(p > s20, '20+', '20-') + '/' +
+        np.where(p > s50, '50+', '50-') + '/' +
+        np.where(p > s200, '200+', '200-'))
+    df['Zirveye mesafe %'] = ((p / num(df['Yuksek 3A']) - 1) * 100).round(1)
     return df
+
+
+def load_history():
+    if os.path.exists(HIST_PATH):
+        try:
+            h = pd.read_csv(HIST_PATH)
+            print(f"Arsiv yuklendi: {len(h)} satir")
+            return h
+        except Exception:
+            print("UYARI: arsiv okunamadi, sifirdan baslaniyor")
+    else:
+        print("Arsiv yok, ilk kayit olusturuluyor")
+    return pd.DataFrame(columns=['Tarih', 'Sembol', 'Fiyat', 'Gunluk %',
+                                 'Hacim 1g', 'Rejim G', 'Rejim H', 'Rejim A',
+                                 'Cakisma', 'ATR %'])
+
+
+def enrich_with_history(df, hist, today):
+    """Arsivden turetilen metrikler: birikim yasi, ATR sikismasi,
+    yon bazli hacim orani, rejim trendi."""
+    if hist.empty:
+        df['Birikim yasi'] = np.nan
+        df['ATR degisim %'] = np.nan
+        df['Yukselen/dusen hacim'] = np.nan
+        df['Rejim A trend'] = np.nan
+        df['Yeni giris'] = ''
+        return df
+
+    h = hist[hist['Tarih'] != today].copy()
+    if h.empty:
+        df['Birikim yasi'] = np.nan
+        df['ATR degisim %'] = np.nan
+        df['Yukselen/dusen hacim'] = np.nan
+        df['Rejim A trend'] = np.nan
+        df['Yeni giris'] = ''
+        return df
+
+    h = h.sort_values('Tarih')
+    out = {}
+
+    for sym, g in h.groupby('Sembol'):
+        g = g.tail(60)
+        # 1) Birikim yasi: kac gundur ust uste Cakisma >= 2
+        yas = 0
+        for c in reversed(g['Cakisma'].tolist()):
+            if c >= 2:
+                yas += 1
+            else:
+                break
+        # 2) ATR degisimi (20 gun once vs bugun arsivdeki son)
+        atr_ser = pd.to_numeric(g['ATR %'], errors='coerce').dropna()
+        atr_chg = np.nan
+        if len(atr_ser) >= 20:
+            eski = atr_ser.iloc[-20]
+            if eski and eski > 0:
+                atr_chg = round((atr_ser.iloc[-1] / eski - 1) * 100, 1)
+        # 3) Yon bazli hacim: yukselen gunlerin ort hacmi / dusen gunlerin
+        gg = g.tail(20).copy()
+        gg['chg'] = pd.to_numeric(gg['Gunluk %'], errors='coerce')
+        gg['vol'] = pd.to_numeric(gg['Hacim 1g'], errors='coerce')
+        up = gg.loc[gg['chg'] > 0, 'vol'].mean()
+        dn = gg.loc[gg['chg'] < 0, 'vol'].mean()
+        ud = round(up / dn, 2) if (dn and dn > 0 and not np.isnan(up)) else np.nan
+        # 4) Rejim A trendi: son deger - 10 gun onceki
+        ra = pd.to_numeric(g['Rejim A'], errors='coerce').dropna()
+        ra_trend = round(ra.iloc[-1] - ra.iloc[-10], 2) if len(ra) >= 10 else np.nan
+        # 5) Dun cakisma
+        dun = g['Cakisma'].iloc[-1] if len(g) else np.nan
+        out[sym] = (yas, atr_chg, ud, ra_trend, dun)
+
+    df['Birikim yasi'] = df['Sembol'].map(lambda s: out.get(s, (np.nan,)*5)[0])
+    df['ATR degisim %'] = df['Sembol'].map(lambda s: out.get(s, (np.nan,)*5)[1])
+    df['Yukselen/dusen hacim'] = df['Sembol'].map(lambda s: out.get(s, (np.nan,)*5)[2])
+    df['Rejim A trend'] = df['Sembol'].map(lambda s: out.get(s, (np.nan,)*5)[3])
+    dun = df['Sembol'].map(lambda s: out.get(s, (np.nan,)*5)[4])
+    df['Yeni giris'] = np.where((df['Cakisma'] >= 2) & (dun < 2), 'YENI', '')
+    return df
+
+
+def classify(df):
+    """Asama siniflandirmasi."""
+    def f(r):
+        if r['Dagitim'] >= 2:
+            return 'DAGITIM'
+        if r['Cakisma'] == 3:
+            return 'TETIKLENME'
+        if r['Sinyal H'] == 1 and r['Sinyal A'] == 1:
+            return 'UYANIS'
+        if r['Sinyal A'] == 1 and r['Cakisma'] == 1:
+            return 'SESSIZ BIRIKIM'
+        if r['Cakisma'] == 2:
+            return 'UYANIS'
+        return ''
+    df['Asama'] = df.apply(f, axis=1)
+    return df
+
+
+def append_history(df, hist, today):
+    yeni = df[['Sembol', 'Fiyat', 'Gunluk %', 'Hacim 1g', 'Rejim G',
+               'Rejim H', 'Rejim A', 'Cakisma', 'ATR %']].copy()
+    yeni.insert(0, 'Tarih', today)
+    hist = hist[hist['Tarih'] != today] if not hist.empty else hist
+    merged = pd.concat([hist, yeni], ignore_index=True)
+    # eski kayitlari buda
+    tarihler = sorted(merged['Tarih'].unique())
+    if len(tarihler) > HIST_KEEP_DAYS:
+        tut = set(tarihler[-HIST_KEEP_DAYS:])
+        merged = merged[merged['Tarih'].isin(tut)]
+    merged.to_csv(HIST_PATH, index=False, encoding='utf-8-sig')
+    print(f"Arsiv guncellendi: {len(merged)} satir, {len(tarihler)} gun")
 
 
 def main():
@@ -173,26 +283,36 @@ def main():
 
     df = pull_market()
     if len(df) < 300:
-        print(f"HATA: {len(df)} satir, cok az. Cikiliyor.")
+        print(f"HATA: {len(df)} satir, cikiliyor")
         sys.exit(1)
 
-    xu100 = pull_xu100_symbols()
+    xu = pull_xu100()
     df = df.rename(columns=RENAME)
     if 'ticker' in df.columns:
         df = df.drop(columns=['ticker'])
-    df['XU100'] = df['Sembol'].astype(str).isin(xu100)
-    df = add_smart_money(df)
+    df['XU100'] = df['Sembol'].astype(str).isin(xu)
+
+    df = compute_signals(df)
+    hist = load_history()
+    df = enrich_with_history(df, hist, today)
+    df = classify(df)
     df.insert(0, 'Tarih', today)
 
     df.to_csv('data/latest.csv', index=False, encoding='utf-8-sig')
-    df.to_csv(f'data/bist_{today}.csv', index=False, encoding='utf-8-sig')
     print(f"Kaydedildi: data/latest.csv ({len(df)} satir, {len(df.columns)} kolon)")
+    append_history(df, hist, today)
 
     macro = pull_macro()
     if len(macro):
         macro.insert(0, 'Tarih', today)
         macro.to_csv('data/macro.csv', index=False, encoding='utf-8-sig')
-        print("Kaydedildi: data/macro.csv")
+
+    # ozet log
+    print("\n--- OZET ---")
+    print(f"3/3 cakisma: {(df['Cakisma']==3).sum()}")
+    print(f"2/3 cakisma: {(df['Cakisma']==2).sum()}")
+    print(f"Dagitim (>=2): {(df['Dagitim']>=2).sum()}")
+    print(df['Asama'].value_counts().to_string())
 
 
 if __name__ == '__main__':
